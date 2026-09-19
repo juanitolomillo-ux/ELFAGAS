@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELFAGAS — Órdenes de Servicio</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="app">
+
+    <!-- HEADER FIJO EMPRESA (no editable en uso diario) -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo-circle" id="logoPreview">
+          <span>💧</span>
+        </div>
+        <div class="brand-text">
+          <h1>ELFAGAS INSTALACIONES</h1>
+          <p class="giro">Gasfitería · Calefacción · Aire acondicionado</p>
+          <p class="empresa-fija">
+            <span>RUT 76.958.735-7</span>
+            <span class="sep">·</span>
+            <span>Giro: Obras menores, calefacción, gasfitería y A/C</span>
+          </p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn btn-ghost" id="btnBuscar">📍 Buscar por dirección</button>
+        <button type="button" class="btn btn-ghost" id="btnAgenda">📅 Agenda del día</button>
+        <button type="button" class="btn btn-ghost" id="btnReporte">📊 Reporte mensual</button>
+        <button type="button" class="btn btn-primary" id="btnNueva">+ Nueva orden</button>
+      </div>
+    </header>
+
+    <!-- LAYOUT PRINCIPAL: formulario + resumen -->
+    <div class="main-grid">
+      <form id="ordenForm" class="form-col">
+
+        <!-- Nº y estado -->
+        <section class="card card-row">
+          <div class="form-group">
+            <label>Nº Orden</label>
+            <input type="text" id="ordenNumero" readonly>
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" id="fechaServicio">
+          </div>
+          <div class="form-group">
+            <label>Estado</label>
+            <select id="estado">
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="EN CAMINO">En camino</option>
+              <option value="FINALIZADO" selected>Finalizado</option>
+              <option value="GARANTIA">Garantía / Revisita</option>
+              <option value="CANCELADO">Cancelado</option>
+            </select>
+          </div>
+        </section>
+
+        <!-- Cliente -->
+        <section class="card">
+          <h2><span class="icon">👤</span> Datos del cliente</h2>
+          <div class="grid-4">
+            <div class="form-group">
+              <label>Nombre *</label>
+              <input type="text" id="clienteNombre" required placeholder="Ej. Sharon Mackay">
+            </div>
+            <div class="form-group">
+              <label>RUT</label>
+              <input type="text" id="clienteRut" placeholder="12.345.678-9">
+            </div>
+            <div class="form-group">
+              <label>Teléfono *</label>
+              <input type="text" id="clienteTel" required placeholder="+569 75529107">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="clienteEmail" placeholder="cliente@email.cl">
+            </div>
+          </div>
+        </section>
+
+        <!-- Domicilio -->
+        <section class="card">
+          <h2><span class="icon">📍</span> Domicilio del servicio</h2>
+          <div class="form-group">
+            <label>Dirección completa *</label>
+            <input type="text" id="direccion" required placeholder="Ej. Valle del Huasco #441">
+          </div>
+          <div class="grid-3">
+            <div class="form-group">
+              <label>Comuna *</label>
+              <input type="text" id="comuna" required placeholder="San Bernardo">
+            </div>
+            <div class="form-group">
+              <label>Tipo de inmueble</label>
+              <div class="radio-row">
+                <label class="radio"><input type="radio" name="tipoInmueble" value="Casa" checked> Casa</label>
+                <label class="radio"><input type="radio" name="tipoInmueble" value="Depto"> Depto</label>
+                <label class="radio"><input type="radio" name="tipoInmueble" value="Local"> Local</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Técnico / Recepcionado por</label>
+              <input type="text" id="tecnico" placeholder="Nombre del técnico">
+            </div>
+          </div>
+        </section>
+
+        <!-- Tipo de servicio -->
+        <section class="card">
+          <h2><span class="icon">🔧</span> Tipo de servicio</h2>
+          <div class="chips" id="tipoServicioChips">
+            <button type="button" class="chip chip-urgencia active" data-tipo="Urgencia">⚠ Urgencia</button>
+            <button type="button" class="chip chip-mantencion" data-tipo="Mantención">⚙ Mantención</button>
+            <button type="button" class="chip chip-instalacion" data-tipo="Instalación">🏠 Instalación</button>
+            <button type="button" class="chip chip-garantia" data-tipo="Garantía">🛡 Garantía</button>
+          </div>
+          <input type="hidden" id="tipoServicio" value="Urgencia">
+        </section>
+
+        <!-- Descripción del servicio (ancho completo) -->
+        <section class="card card-full">
+          <h2><span class="icon">📝</span> Descripción del servicio</h2>
+          <textarea id="descripcionServicio" rows="5" class="ta-wide" placeholder="Ej. Servicio consistió en detectar filtración afectando al piso de abajo. El punto de filtración provenía de un flexible en mal estado. Método utilizado: gas trazador. También se cambió la llave de paso de agua caliente..."></textarea>
+        </section>
+
+        <!-- Trabajos -->
+        <section class="card">
+          <div class="card-head">
+            <h2><span class="icon">✓</span> Trabajos realizados</h2>
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddTrabajo">+ Agregar</button>
+          </div>
+          <div id="trabajosList" class="trabajos-list"></div>
+        </section>
+
+        <!-- Materiales -->
+        <section class="card">
+          <div class="card-head">
+            <h2><span class="icon">📦</span> Materiales y valores</h2>
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddMaterial">+ Agregar</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="tablaMateriales">
+              <thead>
+                <tr>
+                  <th style="width:70px">Cant.</th>
+                  <th>Producto / Servicio</th>
+                  <th style="width:120px" id="thPrecio">Precio</th>
+                  <th style="width:120px" id="thTotalLinea">Total</th>
+                  <th style="width:40px"></th>
+                </tr>
+              </thead>
+              <tbody id="materialesBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Antes / Después -->
+        <section class="card card-full">
+          <h2><span class="icon">📷</span> Antes y después</h2>
+          <div class="antes-despues">
+            <div class="ad-col">
+              <h3 class="ad-title ad-antes">Antes</h3>
+              <textarea id="textoAntes" rows="4" class="ta-wide" placeholder="Describe el estado inicial: filtración, llave sin funcionar, zona afectada..."></textarea>
+              <div class="form-group" style="margin-top:8px;">
+                <label>Foto antes (opcional)</label>
+                <input type="file" id="fotoAntes" accept="image/*">
+                <div id="previewAntes" class="foto-preview"></div>
+              </div>
+            </div>
+            <div class="ad-col">
+              <h3 class="ad-title ad-despues">Después</h3>
+              <textarea id="textoDespues" rows="4" class="ta-wide" placeholder="Describe el resultado: flexible nuevo, llave cambiada, zona con mezcla..."></textarea>
+              <div class="form-group" style="margin-top:8px;">
+                <label>Foto después (opcional)</label>
+                <input type="file" id="fotoDespues" accept="image/*">
+                <div id="previewDespues" class="foto-preview"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Observaciones (ancho completo) -->
+        <section class="card card-full">
+          <h2><span class="icon">💬</span> Observaciones</h2>
+          <textarea id="observaciones" rows="5" class="ta-wide" placeholder="Se deja con mezcla la zona afectada. Garantía 30 días en mano de obra. Se recomienda revisión en 6 meses..."></textarea>
+        </section>
+
+        <!-- Historial domicilio -->
+        <section class="card card-full" id="historialCard">
+          <h2><span class="icon">🕐</span> Historial de este domicilio <span id="historialCount" class="badge-count"></span></h2>
+          <div id="historialLista" class="historial-lista">
+            <p class="hint-inline" id="historialVacio">Escribe una dirección para ver visitas anteriores en este domicilio.</p>
+          </div>
+        </section>
+
+      </form>
+
+      <!-- PANEL DERECHO: resumen fijo -->
+      <aside class="side-panel">
+        <div class="resumen-card">
+          <h3>Resumen de la orden</h3>
+
+          <div class="iva-toggle-box">
+            <label class="switch-label">
+              <input type="checkbox" id="aplicarIva">
+              <span class="switch-ui"></span>
+              <span class="switch-text">Aplicar IVA 19%</span>
+            </label>
+            <p class="iva-hint" id="ivaHint">Cliente particular (casa) — sin IVA</p>
+          </div>
+
+          <div class="resumen-line">
+            <span id="labelSubtotal">Subtotal</span>
+            <strong id="resumenSubtotal">$ 0</strong>
+          </div>
+          <div class="resumen-line" id="lineaIva" style="display:none;">
+            <span>IVA 19%</span>
+            <strong id="resumenIva">$ 0</strong>
+          </div>
+          <div class="resumen-total">
+            <span>TOTAL</span>
+            <strong id="resumenTotal">$ 0</strong>
+          </div>
+          <p class="resumen-note" id="resumenNote">Sin IVA (cliente particular)</p>
+          <button type="button" class="btn btn-primary btn-block" id="btnGuardar">💾 Guardar orden</button>
+          <button type="button" class="btn btn-outline btn-block" id="btnGenerarPdf">⬇ Generar PDF informe</button>
+        </div>
+
+        <!-- Datos empresa fijos (referencia) -->
+        <div class="empresa-box">
+          <h4>Datos de la empresa</h4>
+          <p><strong>ELFAGAS INSTALACIONES SPA</strong></p>
+          <p>RUT: 76.958.735-7</p>
+          <p>Giro: Obras menores, calefacción, gasfitería y aire acondicionado</p>
+          <p class="muted">Estos datos son fijos y aparecen en el PDF. No se modifican desde aquí.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- MODAL AGENDA DEL DÍA -->
+  <div id="modalAgenda" class="modal hidden">
+    <div class="modal-content" style="max-width:720px;">
+      <div class="modal-header">
+        <h2>📅 Agenda del día</h2>
+        <button type="button" class="btn-close" id="cerrarModalAgenda">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="search-box" style="align-items:flex-end;">
+          <div class="form-group" style="margin:0;flex:1;">
+            <label>Fecha</label>
+            <input type="date" id="agendaFecha">
+          </div>
+          <button type="button" class="btn btn-primary" id="btnCargarAgenda">Ver agenda</button>
+        </div>
+        <div id="agendaResumen" class="agenda-stats"></div>
+        <div id="agendaLista" class="search-results">
+          <p class="hint">Elige una fecha para ver los trabajos del día.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BUSCAR -->
+  <div id="modalBuscar" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Buscar órdenes</h2>
+        <button type="button" class="btn-close" id="cerrarModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Dirección, comuna, cliente, RUT o teléfono...">
+          <button type="button" class="btn btn-primary" id="btnDoSearch">Buscar</button>
+        </div>
+        <div id="searchResults" class="search-results">
+          <p class="hint">Busca por dirección, cliente o teléfono.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL REPORTE -->
+  <div id="modalReporte" class="modal hidden">
+    <div class="modal-content" style="max-width:800px;">
+      <div class="modal-header">
+        <h2>📊 Reporte mensual de ventas</h2>
+        <button type="button" class="btn-close" id="cerrarModalReporte">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="search-box" style="flex-wrap:wrap; gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label>Mes</label>
+            <select id="reporteMes">
+              <option value="1">Enero</option><option value="2">Febrero</option>
+              <option value="3">Marzo</option><option value="4">Abril</option>
+              <option value="5">Mayo</option><option value="6">Junio</option>
+              <option value="7">Julio</option><option value="8">Agosto</option>
+              <option value="9">Septiembre</option><option value="10">Octubre</option>
+              <option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Año</label>
+            <input type="number" id="reporteAnio" style="width:100px;" min="2020" max="2100">
+          </div>
+          <button type="button" class="btn btn-primary" id="btnGenerarReporte" style="align-self:flex-end;">Generar</button>
+        </div>
+        <div id="reporteResumen" class="search-results" style="margin-top:16px;">
+          <p class="hint">Elige mes y año.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnPdfReporte" disabled style="margin-top:12px;">📄 Descargar PDF</button>
+        <p class="muted" style="margin-top:10px;font-size:0.8rem;">El reporte también se envía automáticamente el día 1 de cada mes al correo configurado en el código (no visible en la web).</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
