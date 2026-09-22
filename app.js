@@ -22,8 +22,60 @@ let supabaseClient = null;
 let useSupabase = false;
 let ordenActualId = null;
 let ultimoReporte = null;
+let logoBase64 = null;
 let fotoAntesBase64 = null;
 let fotoDespuesBase64 = null;
+
+
+function loadLogo() {
+  // Prueba varios nombres comunes (minúsculas/mayúsculas y extensiones)
+  const candidatos = [
+    'logo.png', 'logo.jpg', 'logo.jpeg', 'logo.webp',
+    'Logo.png', 'Logo.jpg', 'logo.PNG', 'LOGO.png'
+  ];
+  let i = 0;
+
+  function probar() {
+    if (i >= candidatos.length) {
+      console.log('No se encontró logo — deja el archivo como logo.png junto a index.html');
+      return;
+    }
+    const src = candidatos[i++];
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        // limitar tamaño para el PDF
+        const max = 256;
+        let w = img.width, h = img.height;
+        if (w > max || h > max) {
+          const r = Math.min(max / w, max / h);
+          w = Math.round(w * r);
+          h = Math.round(h * r);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        logoBase64 = canvas.toDataURL('image/png');
+      } catch (e) {
+        logoBase64 = src;
+      }
+      const preview = document.getElementById('logoPreview');
+      if (preview) {
+        preview.innerHTML = '';
+        const el = document.createElement('img');
+        el.src = src;
+        el.alt = 'Logo';
+        preview.appendChild(el);
+      }
+      console.log('Logo cargado:', src);
+    };
+    img.onerror = () => probar();
+    img.src = src + '?v=' + Date.now(); // evita caché vieja
+  }
+  probar();
+}
 
 // ---------- UTILS ----------
 function formatCLP(n) {
@@ -501,16 +553,24 @@ function generarPDF() {
   doc.setFillColor(...blue);
   doc.rect(0, 32, pageW, 2.2, 'F');
 
+  let textX = m;
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', m, 6, 18, 18);
+      textX = m + 22;
+    } catch (e) { console.warn(e); }
+  }
+
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
-  doc.text(EMPRESA.nombre, m, 13);
+  doc.text(EMPRESA.nombre, textX, 13);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(186, 200, 220);
-  doc.text('RUT ' + EMPRESA.rut, m, 19);
-  doc.text(EMPRESA.giro, m, 24);
+  doc.text('RUT ' + EMPRESA.rut, textX, 19);
+  doc.text(EMPRESA.giro, textX, 24);
 
   // Fecha + Nº a la derecha
   doc.setTextColor(255, 255, 255);
@@ -990,6 +1050,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initSupabase();
   }
 
+  loadLogo();
   await limpiarFormulario();
 
   // Chips tipo servicio
