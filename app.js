@@ -5,7 +5,7 @@
 
 // ---- EMPRESA FIJA (aparece en PDF, no se edita en la UI) ----
 const EMPRESA = {
-  nombre: 'ELFAGAS INSTALACIONES SPA',
+  nombre: 'SOLUCIONES GASFITERIA',
   rut: '76.958.735-7',
   giro: 'Obras menores, calefacción, gasfitería y aire acondicionado',
   rubro: 'Gasfitería · Calefacción · Aire acondicionado'
