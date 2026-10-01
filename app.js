@@ -344,6 +344,9 @@ async function limpiarFormulario() {
   document.getElementById('historialCount').textContent = '';
   const ivaCb = document.getElementById('aplicarIva');
   if (ivaCb) ivaCb.checked = false;
+  const fp = document.getElementById('formaPago');
+  if (fp) fp.value = '';
+  if (typeof actualizarFormaPagoUI === 'function') actualizarFormaPagoUI();
   addTrabajo();
   addMaterial();
   calcularTotales();
@@ -387,6 +390,20 @@ function cargarOrden(orden) {
   const ivaCb = document.getElementById('aplicarIva');
   if (ivaCb) ivaCb.checked = !!orden.aplicarIva;
   calcularTotales();
+  const fp = document.getElementById('formaPago');
+  if (fp) fp.value = orden.formaPago || '';
+  if (orden.transferencia) {
+    const t = orden.transferencia;
+    if (document.getElementById('transfNombre')) document.getElementById('transfNombre').value = t.nombre || '';
+    if (document.getElementById('transfRut')) document.getElementById('transfRut').value = t.rut || '';
+    if (document.getElementById('transfTipoCuenta')) document.getElementById('transfTipoCuenta').value = t.tipoCuenta || '';
+    if (document.getElementById('transfNumeroCuenta')) document.getElementById('transfNumeroCuenta').value = t.numeroCuenta || '';
+    if (document.getElementById('transfBanco')) document.getElementById('transfBanco').value = t.banco || '';
+    if (document.getElementById('transfEmail')) document.getElementById('transfEmail').value = t.email || '';
+  }
+  if (document.getElementById('comisionDebito') && orden.comisionDebito != null) document.getElementById('comisionDebito').value = orden.comisionDebito;
+  if (document.getElementById('comisionCredito') && orden.comisionCredito != null) document.getElementById('comisionCredito').value = orden.comisionCredito;
+  if (typeof actualizarFormaPagoUI === 'function') actualizarFormaPagoUI();
   cargarHistorialDomicilio(orden.direccion, orden.comuna, orden.id);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -417,6 +434,17 @@ function recolectarDatos() {
     textoDespues: document.getElementById('textoDespues').value.trim(),
     fotoAntes: fotoAntesBase64,
     fotoDespues: fotoDespuesBase64,
+    formaPago: document.getElementById('formaPago')?.value || '',
+    transferencia: {
+      nombre: document.getElementById('transfNombre')?.value.trim() || '',
+      rut: document.getElementById('transfRut')?.value.trim() || '',
+      tipoCuenta: document.getElementById('transfTipoCuenta')?.value.trim() || '',
+      numeroCuenta: document.getElementById('transfNumeroCuenta')?.value.trim() || '',
+      banco: document.getElementById('transfBanco')?.value.trim() || '',
+      email: document.getElementById('transfEmail')?.value.trim() || ''
+    },
+    comisionDebito: parseNumber(document.getElementById('comisionDebito')?.value),
+    comisionCredito: parseNumber(document.getElementById('comisionCredito')?.value),
     empresa: EMPRESA,
     fechaGuardado: new Date().toISOString()
   };
@@ -522,6 +550,51 @@ async function realizarBusqueda() {
       if (o) { cargarOrden(o); cerrarBuscador(); }
     });
   });
+}
+
+// ---------- PRESUPUESTOS ----------
+function abrirPresupuestos() {
+  document.getElementById('modalPresupuestos').classList.remove('hidden');
+  listarPresupuestos();
+}
+function cerrarPresupuestos() {
+  document.getElementById('modalPresupuestos').classList.add('hidden');
+}
+async function listarPresupuestos() {
+  const resultsDiv = document.getElementById('presupuestosResults');
+  resultsDiv.innerHTML = '<p class="hint">Cargando presupuestos...</p>';
+  const ordenes = await getOrdenes();
+  const presupuestos = ordenes
+    .filter(o => (o.estado || '').toUpperCase() === 'PRESUPUESTO')
+    .sort((a, b) => (b.fechaGuardado || '').localeCompare(a.fechaGuardado || ''));
+  if (!presupuestos.length) {
+    resultsDiv.innerHTML = '<p class="hint">No hay presupuestos activos.</p>';
+    return;
+  }
+  resultsDiv.innerHTML = presupuestos.map(o => `
+    <div class="orden-item" data-id="${o.id}">
+      <div><span class="orden-num">Nº ${o.ordenNumero}</span> · PRESUPUESTO · ${o.tipoServicio || ''}</div>
+      <div class="meta"><strong>${o.clienteNombre || ''}</strong> · ${o.clienteTel || ''}</div>
+      <div class="meta">📍 ${o.direccion || ''}${o.comuna ? ', ' + o.comuna : ''} · $${formatCLP(o.total)}</div>
+    </div>
+  `).join('');
+  resultsDiv.querySelectorAll('.orden-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const o = ordenes.find(x => x.id === el.dataset.id);
+      if (o) { cargarOrden(o); cerrarPresupuestos(); }
+    });
+  });
+}
+
+// ---------- FORMA DE PAGO ----------
+function actualizarFormaPagoUI() {
+  const v = document.getElementById('formaPago')?.value || '';
+  const boxT = document.getElementById('boxTransferencia');
+  const boxTar = document.getElementById('boxTarjeta');
+  const boxE = document.getElementById('boxEfectivo');
+  if (boxT) boxT.style.display = v === 'TRANSFERENCIA' ? 'block' : 'none';
+  if (boxTar) boxTar.style.display = v === 'TARJETA' ? 'block' : 'none';
+  if (boxE) boxE.style.display = v === 'EFECTIVO' ? 'block' : 'none';
 }
 
 // ---------- PDF ----------
@@ -883,7 +956,47 @@ function generarPDF() {
   );
 
   const name = `Orden_${datos.ordenNumero}_${(datos.comuna || 'elfagas').replace(/\s/g, '')}.pdf`;
-  doc.save(name);
+  
+  // ===== FORMA DE PAGO =====
+  if (datos.formaPago) {
+    if (y > 250) { doc.addPage(); y = 20; }
+    y += 8;
+    doc.setTextColor(...navy);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('FORMA DE PAGO', m, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...dark);
+    if (datos.formaPago === 'EFECTIVO') {
+      doc.text('Efectivo — pago presencial con la persona a cargo.', m, y);
+      y += 6;
+    } else if (datos.formaPago === 'TRANSFERENCIA' && datos.transferencia) {
+      const t = datos.transferencia;
+      doc.text('Transferencia bancaria', m, y); y += 5;
+      doc.setTextColor(...muted);
+      doc.setFontSize(8);
+      [
+        'Titular: ' + (t.nombre || '—'),
+        'RUT: ' + (t.rut || '—'),
+        'Tipo cuenta: ' + (t.tipoCuenta || '—'),
+        'Nº cuenta: ' + (t.numeroCuenta || '—'),
+        'Banco: ' + (t.banco || '—'),
+        'Email: ' + (t.email || '—')
+      ].forEach(line => { doc.text(line, m, y); y += 4.2; });
+      y += 2;
+    } else if (datos.formaPago === 'TARJETA') {
+      doc.text('Tarjeta débito/crédito — pago presencial con la persona a cargo.', m, y);
+      y += 5;
+      doc.setTextColor(...muted);
+      doc.setFontSize(8);
+      doc.text('Comisión débito: ' + (datos.comisionDebito ?? '—') + '%  ·  Comisión crédito: ' + (datos.comisionCredito ?? '—') + '%', m, y);
+      y += 6;
+    }
+  }
+
+doc.save(name);
 }
 
 // ---------- REPORTE ----------
@@ -1072,6 +1185,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('btnBuscar').addEventListener('click', abrirBuscador);
   document.getElementById('cerrarModal').addEventListener('click', cerrarBuscador);
+  document.getElementById('btnPresupuestos')?.addEventListener('click', abrirPresupuestos);
+  document.getElementById('cerrarModalPresupuestos')?.addEventListener('click', cerrarPresupuestos);
+  document.getElementById('modalPresupuestos')?.addEventListener('click', e => {
+    if (e.target.id === 'modalPresupuestos') cerrarPresupuestos();
+  });
+  document.getElementById('formaPago')?.addEventListener('change', actualizarFormaPagoUI);
   document.getElementById('btnDoSearch').addEventListener('click', realizarBusqueda);
   document.getElementById('searchInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') realizarBusqueda();
