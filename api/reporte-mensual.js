@@ -9,7 +9,7 @@
 // ============================================================
 //  >>>  MODIFICA AQUÍ TU GMAIL (no aparece en la web)
 // ============================================================
-const ADMIN_EMAIL = 'tu-correo@gmail.com';
+const ADMIN_EMAIL = 'Fpacheco.0405@gmail.com';
 // Ejemplo: const ADMIN_EMAIL = 'elfagas.admin@gmail.com';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kwgwsixsmppxibayxzor.supabase.co';
