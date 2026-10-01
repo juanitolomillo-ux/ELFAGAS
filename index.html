@@ -30,6 +30,7 @@
       </div>
       <div class="top-actions">
         <button type="button" class="btn btn-ghost" id="btnBuscar">📍 Buscar por dirección</button>
+        <button type="button" class="btn btn-ghost" id="btnPresupuestos">📋 Ver presupuestos</button>
         <button type="button" class="btn btn-ghost" id="btnAgenda">📅 Agenda del día</button>
         <button type="button" class="btn btn-ghost" id="btnReporte">📊 Reporte mensual</button>
         <button type="button" class="btn btn-primary" id="btnNueva">+ Nueva orden</button>
@@ -53,6 +54,7 @@
           <div class="form-group">
             <label>Estado</label>
             <select id="estado">
+              <option value="PRESUPUESTO">Presupuesto</option>
               <option value="PENDIENTE">Pendiente</option>
               <option value="EN CAMINO">En camino</option>
               <option value="FINALIZADO" selected>Finalizado</option>
@@ -199,7 +201,70 @@
             <p class="hint-inline" id="historialVacio">Escribe una dirección para ver visitas anteriores en este domicilio.</p>
           </div>
         </section>
+                <!-- FORMA DE PAGO -->
+        <section class="card">
+          <h2><span class="icon">💳</span> Forma de pago</h2>
+          <div class="form-group">
+            <label>Cómo paga el cliente</label>
+            <select id="formaPago">
+              <option value="">— Seleccionar —</option>
+              <option value="EFECTIVO">Efectivo (presencial)</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="TARJETA">Tarjeta débito/crédito (presencial)</option>
+            </select>
+          </div>
 
+          <!-- Solo se muestra si elige Transferencia -->
+          <div id="boxTransferencia" class="pago-box" style="display:none;">
+            <p class="pago-titulo">Datos para transferencia (fijos)</p>
+            <div class="grid-2-pago">
+              <div class="form-group">
+                <label>Nombre titular</label>
+                <input type="text" id="transfNombre" value="Byron Alexander Marín Santana">
+              </div>
+              <div class="form-group">
+                <label>RUT</label>
+                <input type="text" id="transfRut" value="20.190.687-3">
+              </div>
+              <div class="form-group">
+                <label>Tipo de cuenta</label>
+                <input type="text" id="transfTipoCuenta" value="Cuenta Vista">
+              </div>
+              <div class="form-group">
+                <label>Nº de cuenta</label>
+                <input type="text" id="transfNumeroCuenta" value="1034956604">
+              </div>
+              <div class="form-group">
+                <label>Banco</label>
+                <input type="text" id="transfBanco" value="Mercado Pago">
+              </div>
+              <div class="form-group">
+                <label>Correo electrónico</label>
+                <input type="email" id="transfEmail" value="byron.marin.santana@gmail.com">
+              </div>
+            </div>
+          </div>
+
+          <!-- Solo se muestra si elige Tarjeta -->
+          <div id="boxTarjeta" class="pago-box" style="display:none;">
+            <p class="pago-titulo">Comisión por tarjeta (la defines tú)</p>
+            <div class="grid-2-pago">
+              <div class="form-group">
+                <label>Comisión débito (%)</label>
+                <input type="number" id="comisionDebito" value="2.6" min="0" step="0.1">
+              </div>
+              <div class="form-group">
+                <label>Comisión crédito (%)</label>
+                <input type="number" id="comisionCredito" value="3.2" min="0" step="0.1">
+              </div>
+            </div>
+            <p class="pago-hint">Pago presencial con la persona a cargo. Las comisiones se muestran en el PDF.</p>
+          </div>
+
+          <div id="boxEfectivo" class="pago-box" style="display:none;">
+            <p class="pago-hint">Pago en efectivo, presencial con la persona a cargo.</p>
+          </div>
+        </section>
       </form>
 
       <!-- PANEL DERECHO: resumen fijo -->
@@ -242,6 +307,22 @@
           <p class="muted">Estos datos son fijos y aparecen en el PDF. No se modifican desde aquí.</p>
         </div>
       </aside>
+    </div>
+  </div>
+
+  <!-- MODAL PRESUPUESTOS -->
+  <div id="modalPresupuestos" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📋 Presupuestos activos</h2>
+        <button type="button" class="btn-close" id="cerrarModalPresupuestos">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom:12px;">Solo órdenes con estado PRESUPUESTO. Al cambiar el estado y guardar, salen de esta lista.</p>
+        <div id="presupuestosResults" class="search-results">
+          <p class="hint">Cargando...</p>
+        </div>
+      </div>
     </div>
   </div>
 
